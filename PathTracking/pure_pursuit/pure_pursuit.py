@@ -30,6 +30,7 @@ class State:
         self.rear_x = self.x - ((WB / 2) * math.cos(self.yaw))
         self.rear_y = self.y - ((WB / 2) * math.sin(self.yaw))
 
+    #
     def update(self, a, delta):
         self.x += self.v * math.cos(self.yaw) * dt
         self.y += self.v * math.sin(self.yaw) * dt
@@ -74,6 +75,7 @@ class TargetCourse:
         self.cy = cy
         self.old_nearest_point_index = None
 
+    # function returns ind(index), Lf(look ahead distance)
     def search_target_index(self, state):
 
         # To speed up nearest point search, doing it at only first time.
@@ -97,6 +99,13 @@ class TargetCourse:
                 distance_this_index = distance_next_index
             self.old_nearest_point_index = ind
 
+        """
+        The pure pursuit controller is a simple control.
+        It ignores dynamic forces on the vehicles and assumes the no-slip condition holds at the wheels.
+        Moreover, if it is tuned for low speed, the controller would be dangerously aggressive at high speeds.
+        One improvement is to vary the look-ahead distance 𝑙𝑑 based on the speed of the vehicle.
+        """
+        # With the speed increasing, Lf becomes larger, the target point is further
         Lf = k * state.v + Lfc  # update look ahead distance
 
         # search look ahead target point index
@@ -108,6 +117,7 @@ class TargetCourse:
         return ind, Lf
 
 
+# function return delta (steering angle), ind(index for the target point)
 def pure_pursuit_steer_control(state, trajectory, pind):
     ind, Lf = trajectory.search_target_index(state)
 
@@ -148,7 +158,7 @@ def main():
     cx = np.arange(0, 50, 0.5)
     cy = [math.sin(ix / 5.0) * ix / 2.0 for ix in cx]
 
-    target_speed = 10.0 / 3.6  # [m/s]
+    target_speed = 50.0 / 3.6  # [m/s]
 
     T = 100.0  # max simulation time
 
@@ -164,11 +174,13 @@ def main():
 
     while T >= time and lastIndex > target_ind:
 
-        # Calc control input
+        # Calc control input, ai = Kp(target_speed - state.v)
         ai = proportional_control(target_speed, state.v)
+        # di (steering angle), ind(index for the target point)
         di, target_ind = pure_pursuit_steer_control(
             state, target_course, target_ind)
 
+        # ai is the acceleration == Kp(target_speed - state.v)
         state.update(ai, di)  # Control vehicle
 
         time += dt
